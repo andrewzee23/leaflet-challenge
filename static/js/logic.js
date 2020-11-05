@@ -1,89 +1,110 @@
 // Store API link
-var link = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson"
+var queryUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson"
 
-function markerSize(mag) {
-  return mag * 30000;
-}
 
-function markerColor(mag) {
-  if (mag <= 1) {
-      return "#ADFF2F";
-  } else if (mag <= 2) {
-      return "#9ACD32";
-  } else if (mag <= 3) {
-      return "#FFFF00";
-  } else if (mag <= 4) {
-      return "#ffd700";
-  } else if (mag <= 5) {
-      return "#FFA500";
-  } else {
-      return "#FF0000";
-  };
-}
-// Perform a GET request to the query URL
-d3.json(link, function(data) {
-  // Once we get a response, send the data.features object to the createFeatures function
+d3.json(queryUrl, function(data) {
+
   createFeatures(data.features);
+  console.log(data.features)
 });
 
 function createFeatures(earthquakeData) {
 
-  var earthquakes = L.geoJSON(earthquakeData, {
-  // Define a function we want to run once for each feature in the features array
-  // Give each feature a popup describing the place and time of the earthquake
- onEachFeature : function (feature, layer) {
-
+  function onEachFeature(feature, layer) {
     layer.bindPopup("<h3>" + feature.properties.place +
-      "</h3><hr><p>" + new Date(feature.properties.time) + "</p>" + "<p> Magnitude: " +  feature.properties.mag + "</p>")
-    },     pointToLayer: function (feature, latlng) {
-      return new L.circle(latlng,
-        {radius: markerSize(feature.properties.mag),
-        fillColor: markerColor(feature.properties.mag),
-        fillOpacity: 1,
-        stroke: false,
-    })
+      "</h3><hr><p>" + new Date(feature.properties.time) + "</p>");
   }
+
+  function radiusSize(magnitude) {
+    return magnitude * 20000;
+  }
+
+
+  function circleColor(magnitude) {
+    if (magnitude < 1) {
+      return "#ccff33"
+    }
+    else if (magnitude < 2) {
+      return "#ffff33"
+    }
+    else if (magnitude < 3) {
+      return "#ffcc33"
+    }
+    else if (magnitude < 4) {
+      return "#ff9933"
+    }
+    else if (magnitude < 5) {
+      return "#ff6633"
+    }
+    else {
+      return "#ff3333"
+    }
+  }
+
+
+  var earthquakes = L.geoJSON(earthquakeData, {
+    pointToLayer: function(earthquakeData, latlng) {
+      return L.circle(latlng, {
+        radius: radiusSize(earthquakeData.properties.mag),
+        color: circleColor(earthquakeData.properties.mag),
+        fillOpacity: 1
+      });
+    },
+    onEachFeature: onEachFeature
   });
-    
 
-
-  // Sending our earthquakes layer to the createMap function
   createMap(earthquakes);
 }
 
 function createMap(earthquakes) {
 
-  // Define satelitemap and darkmap layers
-  var satelitemap = L.tileLayer("https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}", {
+
+  var outdoorsmap = L.tileLayer("https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}", {
     attribution: "Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>",
     maxZoom: 18,
-    id: "mapbox.satellite",
+    id: "outdoors-v11",
     accessToken: API_KEY
   });
 
-  var darkmap = L.tileLayer("https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}", {
-    attribution: "Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>",
+  var satellitemap = L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+    attribution: "© <a href='https://www.mapbox.com/about/maps/'>Mapbox</a> © <a href='http://www.openstreetmap.org/copyright'>OpenStreetMap</a> <strong><a href='https://www.mapbox.com/map-feedback/' target='_blank'>Improve this map</a></strong>",
+    tileSize: 512,
     maxZoom: 18,
-    id: "mapbox.dark",
+    zoomOffset: -1,
+    id: "satellite-v9",
     accessToken: API_KEY
   });
 
+  var grayscalemap = L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+    attribution: "Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>",
+    maxZoom: 18,
+    id: "light-v10",
+    accessToken: API_KEY
+  });
+
+  // Create the faultline layer
+  var faultLine = new L.LayerGroup();
+  
   // Define a baseMaps object to hold our base layers
   var baseMaps = {
-    "Satelite Map": satelitemap,
-    "Dark Map": darkmap
+    "Outdoor Map": outdoorsmap,
+    "Greyscale Map": grayscalemap,
+    "Satellite Map": satellitemap
   };
 
   // Create overlay object to hold our overlay layer
   var overlayMaps = {
-    Earthquakes: earthquakes
+    Earthquakes: earthquakes,
+    FaultLines: faultLine
   };
 
-  // Create our map, giving it the satelitemap and earthquakes layers to display on load
+  // Create our map, giving it the streetmap and earthquakes layers to display on load
   var myMap = L.map("map", {
-    center: [31.57853542647338,-99.580078125],
-    zoom: 3,
-    layers: [satelitemap, earthquakes]
+    center: [
+      37.09, -95.71
+    ],
+    zoom: 4,
+    layers: [outdoorsmap, earthquakes, faultLine]
   });
 
   // Create a layer control
@@ -93,22 +114,46 @@ function createMap(earthquakes) {
     collapsed: false
   }).addTo(myMap);
 
-  var legend = L.control({position: 'bottomright'});
+  // Query to retrieve the faultline data
+  var faultlinequery = "https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_plates.json";
+  
+  // Create the faultlines and add them to the faultline layer
+  d3.json(faultlinequery, function(data) {
+    L.geoJSON(data, {
+      style: function() {
+        return {color: "orange", fillOpacity: 0}
+      }
+    }).addTo(faultLine)
+  })
 
-  legend.onAdd = function () {
+  // color function to be used when creating the legend
+  function getColor(d) {
+    return d > 5 ? '#ff3333' :
+           d > 4  ? '#ff6633' :
+           d > 3  ? '#ff9933' :
+           d > 2  ? '#ffcc33' :
+           d > 1  ? '#ffff33' :
+                    '#ccff33';
+  }
+
+// Add legend to the map
+  var legend = L.control({position: 'bottomright'});
+  
+  legend.onAdd = function (map) {
   
       var div = L.DomUtil.create('div', 'info legend'),
-          magnitudes = [0, 1, 2, 3, 4, 5];
-  
-      for (var i = 0; i < magnitudes.length; i++) {
+          mags = [0, 1, 2, 3, 4, 5],
+          labels = [];
+
+          
+      for (var i = 0; i < mags.length; i++) {
           div.innerHTML +=
-              '<i style="background:' + markerColor(magnitudes[i] + 1) + '"></i> ' + 
-      + magnitudes[i] + (magnitudes[i + 1] ? ' - ' + magnitudes[i + 1] + '<br>' : ' + ');
+              '<i style="background:' + getColor(mags[i] + 1) + '"></i> ' +
+              mags[i] + (mags[i + 1] ? '&ndash;' + mags[i + 1] + '<br>' : '+');
       }
   
       return div;
   };
   
   legend.addTo(myMap);
-
 }
